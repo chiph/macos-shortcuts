@@ -11,7 +11,8 @@
   - `/Applications`
   - `/System/Applications`
 - For each found app, generates a self-contained shortcut "application" bundle in `~/AppShortcuts`.
-- Uses Automator’s Application Stub under the hood so shortcuts behave just like actual apps.
+- Uses Automator's Application Stub under the hood so shortcuts behave just like actual apps.
+- **Extracts and copies the original app's icon** to each shortcut, including support for modern macOS apps that use compiled asset catalogs (`Assets.car`).
 - All created shortcuts can be placed in the Dock without the distracting alias arrow overlay.
 - Produces color-coded terminal output to indicate success, warnings, or errors.
 
@@ -26,15 +27,20 @@
 2. **Shortcut Bundle Generation**
    - For each detected application:
      - Creates a new `.app` bundle directory structure.
-     - Copies the Automator Application Stub binary to serve as the shortcut’s executable.
+     - Copies the Automator Application Stub binary to serve as the shortcut's executable.
      - Dynamically generates an XML workflow (`document.wflow`) to launch the target app via Automator.
-       - The workflow references `/System/Library/Automator/Launch Application.action` and embeds the target app’s path.
+       - The workflow references `/System/Library/Automator/Launch Application.action` and embeds the target app's path.
        - XML-safe escaping ensures all characters/paths are handled correctly.
+     - **Extracts the app's icon** using multiple strategies:
+       - For modern apps with `Assets.car` (Calendar, System Settings, Books, etc.), uses a Swift helper script to extract icons via native macOS APIs.
+       - For traditional apps, copies the `.icns` file specified in the app's `Info.plist`.
+       - Falls back to finding the largest icon file when needed.
 
 3. **Result**
    - Each shortcut bundle is a genuine macOS application:
      - Can be launched, docked, or managed like any standard app.
      - *Does not* show a shortcut arrow overlay.
+     - Displays the original app's icon.
 
 4. **No Arrow Overlay?**
    - Standard Finder aliases or symlinks show a small arrow overlay in the Dock.
@@ -45,7 +51,9 @@
 ### Features & Intended Audience
 
 - Simple: just run the script to populate your `~/AppShortcuts` folder.
-- No configuration or additional scripts required.
+- **Full icon support** including modern macOS apps (Calendar, System Settings, Books, etc.)
+- Intelligently extracts icons from both traditional `.icns` files and compiled `Assets.car` catalogs.
+- No configuration or external dependencies required - everything needed is built into macOS.
 - Ideal for users who want a lightweight, customizable app launcher without the clutter or branding of Launchpad or other third-party tools.
 
 ---
@@ -64,7 +72,14 @@
 
 ### Dependencies
 
-- Requires macOS (tested against versions with Automator pre-installed).
-- No other dependencies or scripts.
+- **Required:**
+  - macOS with Automator pre-installed (standard on all macOS versions)
+  - Swift runtime (pre-installed on macOS)
+  - `iconutil` command-line tool (pre-installed on macOS)
+
+- **Included:**
+  - `extract_icon.swift` - Helper script for extracting icons from modern macOS apps with compiled asset catalogs
+
+- **No external dependencies** - All required tools are built into macOS.
 
 ---

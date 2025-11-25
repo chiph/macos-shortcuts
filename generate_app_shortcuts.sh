@@ -143,35 +143,84 @@ create_info_plist() {
 EOF
 }
 
+# Function to extract icon from app bundle using macOS system tools
+extract_icon_from_app() {
+    local source_app="$1"
+    local target_icns="$2"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # Method 1: Use our Swift icon extractor (handles all apps including Assets.car)
+    if [[ -f "$script_dir/extract_icon.swift" ]]; then
+        if "$script_dir/extract_icon.swift" "$source_app" "$target_icns" &> /dev/null; then
+            return 0
+        fi
+    fi
+    
+    # Method 2: Use fileicon tool if available (brew install fileicon)
+    if command -v fileicon &> /dev/null; then
+        if fileicon get "$source_app" "$target_icns" &> /dev/null; then
+            return 0
+        fi
+    fi
+    
+    # Method 3: For modern apps with Assets.car, use generic icon as fallback
+    if [[ -f "$source_app/Contents/Resources/Assets.car" ]]; then
+        if [[ -f "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns" ]]; then
+            cp "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns" "$target_icns" && return 0
+        fi
+    fi
+    
+    return 1
+}
+
 # Function to extract and copy icon from source app
 copy_app_icon() {
     local source_app="$1"
     local target_resources="$2"
     local icon_copied=false
     
-    # Try to find the icon file in the source app
-    if [[ -d "$source_app/Contents/Resources" ]]; then
-        # Look for .icns files
-        local icns_file=$(find "$source_app/Contents/Resources" -maxdepth 1 -name "*.icns" -print -quit 2>/dev/null)
+    # Strategy 1: If app has Assets.car, prefer extracting from it (modern macOS apps)
+    if [[ -f "$source_app/Contents/Resources/Assets.car" ]]; then
+        if extract_icon_from_app "$source_app" "$target_resources/AutomatorApplet.icns"; then
+            icon_copied=true
+        fi
+    fi
+    
+    # Strategy 2: Try to read CFBundleIconFile from Info.plist
+    if [[ "$icon_copied" == false && -f "$source_app/Contents/Info.plist" ]]; then
+        local icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$source_app/Contents/Info.plist" 2>/dev/null || echo "")
+        
+        if [[ -n "$icon_name" ]]; then
+            # Add .icns extension if not present
+            [[ "$icon_name" != *.icns ]] && icon_name="${icon_name}.icns"
+            
+            # Check if the icon file exists and is reasonable size (> 10KB)
+            if [[ -f "$source_app/Contents/Resources/$icon_name" ]]; then
+                local icon_size=$(stat -f%z "$source_app/Contents/Resources/$icon_name" 2>/dev/null || echo "0")
+                if [[ $icon_size -gt 10240 ]]; then
+                    cp "$source_app/Contents/Resources/$icon_name" "$target_resources/AutomatorApplet.icns"
+                    icon_copied=true
+                fi
+            fi
+        fi
+    fi
+    
+    # Strategy 3: Look for any .icns file in Resources directory (fallback)
+    if [[ "$icon_copied" == false && -d "$source_app/Contents/Resources" ]]; then
+        # Look for the largest .icns file (likely to be the app icon)
+        local icns_file=$(find "$source_app/Contents/Resources" -maxdepth 1 -name "*.icns" -exec ls -S {} + 2>/dev/null | head -1)
         
         if [[ -n "$icns_file" && -f "$icns_file" ]]; then
             cp "$icns_file" "$target_resources/AutomatorApplet.icns"
             icon_copied=true
-        else
-            # Try to read CFBundleIconFile from Info.plist
-            if [[ -f "$source_app/Contents/Info.plist" ]]; then
-                local icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$source_app/Contents/Info.plist" 2>/dev/null || echo "")
-                
-                if [[ -n "$icon_name" ]]; then
-                    # Add .icns extension if not present
-                    [[ "$icon_name" != *.icns ]] && icon_name="${icon_name}.icns"
-                    
-                    if [[ -f "$source_app/Contents/Resources/$icon_name" ]]; then
-                        cp "$source_app/Contents/Resources/$icon_name" "$target_resources/AutomatorApplet.icns"
-                        icon_copied=true
-                    fi
-                fi
-            fi
+        fi
+    fi
+    
+    # Strategy 4: Use macOS to get the icon directly from the app bundle
+    if [[ "$icon_copied" == false ]]; then
+        # Use sips to extract icon - works for most apps including those with Assets.car
+        if sips -s format icns "$source_app" --out "$target_resources/AutomatorApplet.icns" &>/dev/null; then
+            icon_copied=true
         fi
     fi
     
