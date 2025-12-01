@@ -10,6 +10,9 @@ SOURCE_DIRS=("/Applications" "/System/Applications")
 SHORTCUTS_DIR="$HOME/AppShortcuts"
 AUTOMATOR_STUB="/System/Library/CoreServices/Automator Application Stub.app/Contents/MacOS/Automator Application Stub"
 
+# Apps with LSUIElement=true that should still get shortcuts (menu bar apps, etc.)
+INCLUDE_UI_ELEMENT_APPS=("QuickDrop" "DockDoor")
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -256,9 +259,17 @@ needs_update() {
 # Function to check if app should be visible (not a background helper)
 is_visible_app() {
     local app_path="$1"
+    local app_name=$(basename "$app_path" .app)
     local plist_path="$app_path/Contents/Info.plist"
     
     [[ ! -f "$plist_path" ]] && return 0  # No plist, assume visible
+    
+    # Check if app is in the whitelist for LSUIElement apps
+    for allowed_app in "${INCLUDE_UI_ELEMENT_APPS[@]}"; do
+        if [[ "$app_name" == "$allowed_app" ]]; then
+            return 0  # Explicitly allowed
+        fi
+    done
     
     # Check for LSUIElement (hides from Dock/Launchpad)
     local ui_element=$(/usr/libexec/PlistBuddy -c "Print :LSUIElement" "$plist_path" 2>/dev/null || echo "")
