@@ -58,18 +58,6 @@
 
 ---
 
-### Usage
-
-1. Clone or download this repo.
-2. Run `generate_app_shortcuts.sh` from Terminal:
-   ```sh
-   bash generate_app_shortcuts.sh
-   ```
-3. Drag desired shortcuts from `~/AppShortcuts` to your Dock or preferred location.
-   - Remove or rename shortcut bundles as you wish.
-
----
-
 ### Dependencies
 
 - **Required:**
@@ -83,3 +71,18 @@
 - **No external dependencies** - All required tools are built into macOS.
 
 ---
+
+### Suggested Usage
+
+1. Clone or download this repo.
+2. Run `generate_app_shortcuts.sh` from Terminal:
+   ```sh
+   bash generate_app_shortcuts.sh
+   ```
+3. The script will create and populate a directory in your home directory called AppShortcuts. This will be your "source" directory, and will be updated with subsequent runs of the script.
+4. Create a new directory called `Launchpad` in your home directory, with subdirectories (`Productivity`, `Tools`, `System`, etc) for arranging your shortuts)
+5. Drag the `Launchpad` to your Dock .
+6. Right-click the `Launchpad` item in the Dock, select Display as `Folder` and View content as `Folder`. This will give you a look and feel _somewhat_ similar to the original Launchpad. This item's icon can be changed to match the original as well.
+
+---
+
